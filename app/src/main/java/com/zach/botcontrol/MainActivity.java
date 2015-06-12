@@ -5,8 +5,11 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Handler;
+import android.os.Message;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -22,9 +25,8 @@ public class MainActivity extends Activity {
 
     Button buttonUp, buttonDown, buttonLeft, buttonRight;
 
-    private BluetoothAdapter bt;
-    private Set<BluetoothDevice> pairedDevices;
-    ListView lv;
+    private static final String TAG = "Main";
+    private Bluetooth bt;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,37 +36,35 @@ public class MainActivity extends Activity {
         buttonUp = (Button) findViewById(R.id.button_up);
         buttonUp.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                popToast("UP");
+                bt.sendMessage("w");
             }
         });
 
         buttonDown = (Button) findViewById(R.id.button_down);
         buttonDown.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                popToast("DOWN");
+                bt.sendMessage("s");
             }
         });
 
         buttonRight = (Button) findViewById(R.id.button_right);
         buttonRight.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                popToast("RIGHT");
+                bt.sendMessage("d");
             }
         });
 
         buttonLeft = (Button) findViewById(R.id.button_left);
         buttonLeft.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                popToast("LEFT");
+               bt.sendMessage("a");
             }
         });
 
-        bt = BluetoothAdapter.getDefaultAdapter();
-        lv = (ListView) findViewById(R.id.listView);
 
         //Turn on BT
-        bluetoothOn();
-        list();
+        bt = new Bluetooth(this, mHandler);
+        connectService();
     }
 
     @Override
@@ -89,33 +89,24 @@ public class MainActivity extends Activity {
         return super.onOptionsItemSelected(item);
     }
 
-
-    public void list()
-    {
-        pairedDevices = bt.getBondedDevices();
-        ArrayList list = new ArrayList();
-
-        for (BluetoothDevice bt : pairedDevices)
-        {
-            list.add(bt.getName());
-        }
-        final ArrayAdapter adapter = new ArrayAdapter(this, android.R.layout.simple_expandable_list_item_1, list);
-        lv.setAdapter(adapter);
-    }
-
-
-    public void bluetoothOn() {
-        if (!bt.isEnabled()) {
-            Intent turnOn = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-            startActivityForResult(turnOn, 1);
+    public void connectService() {
+        try {
+            popToast("Connecting...");
+            BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+            if (bluetoothAdapter.isEnabled()) {
+                bt.start();
+                bt.connectDevice("HC-06");
+                Log.d(TAG, "Btservice started - listening");
+                popToast("Connected");
+            } else {
+                Log.w(TAG, "Btservice started - bluetooth is not enabled");
+                popToast("Bluetooth Not enabled");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Unable to start bt ", e);
+            popToast("Unable to connect " + e);
         }
     }
-
-    public void bluetoothOff()
-    {
-        bt.disable();
-    }
-
 
 
     public void popToast(String msg) {
@@ -123,4 +114,28 @@ public class MainActivity extends Activity {
         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show();
     }
 
+    private static final Handler mHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case Bluetooth.MESSAGE_STATE_CHANGE:
+                    Log.d(TAG, "MESSAGE_STATE_CHANGE: " + msg.arg1);
+                    break;
+                case Bluetooth.MESSAGE_WRITE:
+                    Log.d(TAG, "MESSAGE_WRITE ");
+                    break;
+                case Bluetooth.MESSAGE_READ:
+                    Log.d(TAG, "MESSAGE_READ ");
+                    break;
+                case Bluetooth.MESSAGE_DEVICE_NAME:
+                    Log.d(TAG, "MESSAGE_DEVICE_NAME " + msg);
+                    break;
+                case Bluetooth.MESSAGE_TOAST:
+                    Log.d(TAG, "MESSAGE_TOAST " + msg);
+                    break;
+            }
+        }
+    };
+
 }
+
